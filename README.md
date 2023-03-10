@@ -7,7 +7,7 @@ It was developed because Go's error handling primitives introduced in Go 1.13
 are quite sufficient, but the lack of tracing capabilities makes it really hard
 to confidently chase problems across layers in a complex application.
 
-Se terr fully embraces the
+So terr fully embraces the
 [changes to errors introduced in Go 1.13](https://go.dev/blog/go1.13-errors),
 but it adds two extra features:
 - file and line information for tracing errors;
