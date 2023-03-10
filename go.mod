@@ -1,3 +1,3 @@
 module github.com/alnvdl/terr
 
-go 1.13
+go 1.20
