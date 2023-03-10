@@ -1,5 +1,9 @@
 # terr
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/alnvdl/terr.svg)](https://pkg.go.dev/github.com/alnvdl/terr)
+[![Test workflow](https://github.com/alnvdl/terr/actions/workflows/test.yaml/badge.svg)](https://github.com/alnvdl/terr/actions/workflows/test.yaml)
+
+
 terr (short for **t**raced **err**or) is a minimalistic library for adding
 error tracing in Go 1.20+.
 
