@@ -52,7 +52,8 @@ used at one point, the error tracing information will be reset at that point
 around `fmt.Errorf`. Any traced error passed to `terr.Newf` will be included in
 the traced error tree, regardless of the `fmt` verb used.
 
-This is an example of terr in use:
+## Example
+The following code:
 ```go
 err := terr.Newf("base")
 traced := terr.Trace(err)
@@ -60,12 +61,13 @@ wrapped := terr.Newf("wrapped: %w", traced)
 masked := terr.Newf("masked: %v", wrapped)
 fmt.Printf("%@\n", masked)
 ```
-Which will output:
+
+Will output:
 ```
-masked: wrapped: base @ /home/alnvdl/dev/terr/terr_test.go:194
-        wrapped: base @ /home/alnvdl/dev/terr/terr_test.go:193
-                base @ /home/alnvdl/dev/terr/terr_test.go:192
-                        base @ /home/alnvdl/dev/terr/terr_test.go:191
+masked: wrapped: base @ /mygomod/file.go:14
+        wrapped: base @ /mygomod/file.go:13
+                base @ /mygomod/file.go:12
+                        base @ /mygomod/file.go:11
 ```
 
 ## Printing errors
