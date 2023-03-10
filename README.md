@@ -5,13 +5,13 @@ error tracing in Go 1.20+.
 
 It was developed because Go's error handling primitives introduced in Go 1.13
 are quite sufficient, but the lack of tracing capabilities makes it really hard
-to confidently chase problems across layers in a complex application.
+to confidently chase problems across layers in complex applications.
 
 So terr fully embraces the
 [changes to errors introduced in Go 1.13](https://go.dev/blog/go1.13-errors),
 but it adds two extra features:
 - file and line information for tracing errors;
-- the ability to print error trees using the `fmt` package;
+- the ability to print error trees using the `fmt` package and the `%@` verb;
 
 Starting with Go 1.20, wrapped errors are kept as a n-ary tree. terr works by
 build a parallel tree containing tracing information, leaving the Go error tree
@@ -47,6 +47,22 @@ used at one point, the error tracing information will be reset at that point
 `terr.Newf` can wrap multiple errors. In fact, it is just a very slim wrapper
 around `fmt.Errorf`. Any traced error passed to `terr.Newf` will be included in
 the traced error tree, regardless of the `fmt` verb used.
+
+This is an example of terr in use:
+```go
+err := terr.Newf("base")
+traced := terr.Trace(err)
+wrapped := terr.Newf("wrapped: %w", traced)
+masked := terr.Newf("masked: %v", wrapped)
+fmt.Printf("%@\n", masked)
+```
+Which will output:
+```
+masked: wrapped: base @ /home/alnvdl/dev/terr/terr_test.go:194
+        wrapped: base @ /home/alnvdl/dev/terr/terr_test.go:193
+                base @ /home/alnvdl/dev/terr/terr_test.go:192
+                        base @ /home/alnvdl/dev/terr/terr_test.go:191
+```
 
 ## Printing errors
 A traced error tree can be printed with the special `%@` formatting verb.
@@ -94,9 +110,9 @@ $ goimports -w .
 ```
 
 Adopting `terr.Trace` is harder, as it's impossible write a simple gofmt
-rewrite rule that works for all cases. `terr.Trace` needs to be applied as
-needed in a code base, typically in cases where `return err` is used, turning
-it into `return terr.Trace(err)`.
+rewrite rule that works for all cases. `terr.Trace` has to be applied as needed
+in a code base, typically in cases where `return err` is used, turning it
+into `return terr.Trace(err)`.
 
 ## Getting rid of terr
 Run the following commands in a folder to recursively get rid of terr in all
