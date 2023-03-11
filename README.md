@@ -10,15 +10,16 @@ Go's error representation primitives introduced in Go 1.13[^1] are quite
 sufficient, but the lack of tracing capabilities makes it hard to confidently
 debug errors across layers in complex applications.
 
-terr fully embraces the native Go handling paradigms, but it adds two features:
+To help with that, terr fully embraces the native Go error handling paradigms,
+but it adds two features:
 - file and line information for tracing errors;
 - the ability to print error trees using the `fmt` package and the `%@` verb;
 
-This library introduces the concept of **traced errors**: a wrapper for regular
-errors that includes the location where they were created (`errors.New`),
-passed along (`return err`), wrapped (`%w`) or masked (`%v`). Traced errors
-keep track of children traced errors that relate to them. An error is a traced
-error if it was returned by one of the functions of this library.
+This library introduces the concept of **traced errors**: a wrapper for errors
+that includes the location where they were created (`errors.New`), passed along
+(`return err`), wrapped (`%w`) or masked (`%v`). Traced errors keep track of
+children traced errors that relate to them. An error is a traced error if it
+was returned by one of the functions of this library.
 
 Traced errors work seamlessly with `errors.Is`, `errors.As` and `errors.Unwrap`
 just as if terr were not being used.
@@ -71,7 +72,7 @@ masked: wrapped: base @ /mygomod/file.go:14
                         base @ /mygomod/file.go:11
 ```
 
-`%@` prints the error tree in an tab-indented, multi-line representation. If a
+`%@` prints the error tree in a tab-indented, multi-line representation. If a
 custom format is needed (e.g., JSON), it is possible to implement a function
 that walks the error tree and generates that tree in the desired format. See
 the [next subsection](#walking-the-traced-error-tree).
