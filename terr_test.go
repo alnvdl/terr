@@ -27,12 +27,6 @@ func assertBool(t *testing.T, got, want bool) {
 	}
 }
 
-func assertErrorIs(t *testing.T, got error, target error) {
-	if !errors.Is(got, target) {
-		t.Fatalf("error.Is returns false for error %v with target %v", got, target)
-	}
-}
-
 func assertErrorIsNil(t *testing.T, got error) {
 	if got != nil {
 		t.Fatalf("want nil error, got %#v", got)

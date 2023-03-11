@@ -3,40 +3,25 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/alnvdl/terr.svg)](https://pkg.go.dev/github.com/alnvdl/terr)
 [![Test workflow](https://github.com/alnvdl/terr/actions/workflows/test.yaml/badge.svg)](https://github.com/alnvdl/terr/actions/workflows/test.yaml)
 
-
 terr (short for **t**raced **err**or) is a minimalistic library for adding
 error tracing in Go 1.20+.
 
-It was developed because Go's error handling primitives introduced in Go 1.13
-are quite sufficient, but the lack of tracing capabilities makes it really hard
-to confidently chase problems across layers in complex applications.
+Go's error representation primitives introduced in Go 1.13[^1] are quite
+sufficient, but the lack of tracing capabilities makes it hard to confidently
+debug errors across layers in complex applications.
 
-So terr fully embraces the
-[changes to errors introduced in Go 1.13](https://go.dev/blog/go1.13-errors),
-but it adds two extra features:
+terr fully embraces the native Go handling paradigms, but it adds two features:
 - file and line information for tracing errors;
 - the ability to print error trees using the `fmt` package and the `%@` verb;
 
-Starting with Go 1.20, wrapped errors are kept as a n-ary tree. terr works by
-build a parallel tree containing tracing information, leaving the Go error tree
-untouched, as if terr weren't being used.
-
 This library introduces the concept of **traced errors**: a wrapper for regular
-errors that includes the location of where they were created (`errors.New`),
+errors that includes the location where they were created (`errors.New`),
 passed along (`return err`), wrapped (`%w`) or masked (`%v`). Traced errors
-keep track of children traced errors that relate to them. Each traced error
-is thus a node of the parallel traced error tree. An error is considered a
-traced error if it was returned by one of the functions of this library.
+keep track of children traced errors that relate to them. An error is a traced
+error if it was returned by one of the functions of this library.
 
 Traced errors work seamlessly with `errors.Is`, `errors.As` and `errors.Unwrap`
-just as if terr were not being used. All of the patterns outlined in the
-[Go 1.13 error handling blog post](https://go.dev/blog/go1.13-errors) are
-supported, but with the addition of error tracing.
-
-In the glorious day Golang introduces error tracing, and assuming it gets done
-in a way that respects error handling as defined in Go 1.13+,
-[removing `terr` from a codebase](#getting-rid-of-terr) should be a matter of
-replacing the `terr` function calls with equivalent documented expressions:
+just as if terr were not being used.
 
 Without terr                   | With terr
 -------------------------------|------------------------------
@@ -44,16 +29,32 @@ Without terr                   | With terr
 `fmt.Errorf("error: %w", err)` | `terr.Newf("error: %w", err)`
 `[return] err`                 | `terr.Trace(err)` (annotates file and line)
 
-To obtain the full trace, terr must be used consistently. If `fmt.Errorf` is
-used at one point, the error tracing information will be reset at that point
-(but Go's wrapped error tree will be preserved even in that case).
+## Under the hood
+Starting with Go 1.20, wrapped errors are kept as a n-ary tree. terr works by
+build a parallel tree containing tracing information, leaving the Go error tree
+untouched, as if terr weren't being used. Each traced error is thus a node of
+the parallel traced error tree.
+
+In the glorious day error tracing is added to Go, and assuming it gets done in
+a way that respects error handling as defined in Go 1.13+,
+[removing `terr` from a codebase](#getting-rid-of-terr) should be a matter of
+replacing the `terr` function calls with the equivalent documented expressions.
 
 `terr.Newf` can wrap multiple errors. In fact, it is just a very slim wrapper
 around `fmt.Errorf`. Any traced error passed to `terr.Newf` will be included in
 the traced error tree, regardless of the `fmt` verb used.
 
-## Example
-The following code:
+`terr.Trace` on the other hand does nothing with the error it receives (no
+wrapping and no masking), but it adds one level to the parallel error tracing
+tree.
+
+To obtain the full trace, terr functions must be used consistently. If
+`fmt.Errorf` is used at one point, the error tracing information will be reset
+at that point, but Go's wrapped error tree will be preserved even in that case.
+
+## Printing errors
+A traced error tree can be printed with the special `%@` formatting verb. For
+example:
 ```go
 err := terr.Newf("base")
 traced := terr.Trace(err)
@@ -70,16 +71,10 @@ masked: wrapped: base @ /mygomod/file.go:14
                         base @ /mygomod/file.go:11
 ```
 
-## Printing errors
-A traced error tree can be printed with the special `%@` formatting verb.
-```go
-fmt.Printf("%@\n", terr.Newf("problem: %w", terr.Newf("error")))
-```
-
-The code above will print the error tree in an tab-indented multi-line
-representation. If a custom format is needed (e.g., JSON), it is possible to
-implement a function that walks the error tree and generates that tree in the
-desired format. See the [next subsection](#walking-the-traced-error-tree).
+`%@` prints the error tree in an tab-indented, multi-line representation. If a
+custom format is needed (e.g., JSON), it is possible to implement a function
+that walks the error tree and generates that tree in the desired format. See
+the [next subsection](#walking-the-traced-error-tree).
 
 ## Walking the traced error tree
 `terr.TraceTree(err) TracedError` can be used to obtain the root of an n-ary
@@ -99,15 +94,13 @@ library, because:
 - even masked (`%v`) errors will be part of the traced error tree if
   `terr.Newf` was used to mask them.
 
-
 Methods provided by the by the Go standard library should be used to walk Go's
 wrapped error tree, which would includes non-traced errors and ignores masked
 errors (e.g., `errors.Unwrap`).
 
 ## Adopting terr
 Run the following commands in a folder to recursively adopt terr in all its
-files (make sure [`goimports`](https://pkg.go.dev/golang.org/x/tools/cmd/goimports)
-is installed first):
+files (make sure `goimports`[^2] is installed first):
 ```sh
 $ go get github.com/alnvdl/terr
 $ gofmt -w -r 'errors.New(a) -> terr.Newf(a)' .
@@ -122,8 +115,7 @@ into `return terr.Trace(err)`.
 
 ## Getting rid of terr
 Run the following commands in a folder to recursively get rid of terr in all
-its files (make sure [`goimports`](https://pkg.go.dev/golang.org/x/tools/cmd/goimports)
-is installed first):
+its files (make sure `goimports`[^2] is installed first):
 ```sh
 $ gofmt -w -r 'terr.Newf(a) -> errors.New(a)' .
 $ gofmt -w -r 'terr.Newf -> fmt.Errorf' .
@@ -132,3 +124,5 @@ $ goimports -w .
 $ go mod tidy
 ```
 
+[^1]: https://go.dev/blog/go1.13-errors
+[^2]: https://pkg.go.dev/golang.org/x/tools/cmd/goimports
