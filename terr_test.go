@@ -27,7 +27,7 @@ func assertErrorIsNil(t *testing.T, got error) {
 	}
 }
 
-func assertTraceTreeEquals(t *testing.T, got terr.TracedError, want terr.TracedError) {
+func assertTraceTreeEquals(t *testing.T, got terr.ErrorTracer, want terr.ErrorTracer) {
 	if got == nil && want == nil {
 		return
 	}
@@ -136,15 +136,15 @@ func (t *traceTreeNode) Location() (string, int) {
 	return t.file, t.line
 }
 
-func (t *traceTreeNode) Children() []terr.TracedError {
-	terrs := make([]terr.TracedError, len(t.children))
+func (t *traceTreeNode) Children() []terr.ErrorTracer {
+	terrs := make([]terr.ErrorTracer, len(t.children))
 	for i := range t.children {
 		terrs[i] = t.children[i]
 	}
 	return terrs
 }
 
-var _ terr.TracedError = (*traceTreeNode)(nil)
+var _ terr.ErrorTracer = (*traceTreeNode)(nil)
 
 func TestNewfMultiple(t *testing.T) {
 	file, line := getLocation(0)

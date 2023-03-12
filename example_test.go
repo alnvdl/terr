@@ -8,8 +8,8 @@ import (
 	"github.com/alnvdl/terr"
 )
 
-// This example shows how to combine different terr functions and print a
-// traced error tree at the end.
+// This example shows how to combine different terr functions and print an
+// error tracing tree at the end.
 func Example() {
 	err := terr.Newf("base")
 	traced := terr.Trace(err)
@@ -18,10 +18,10 @@ func Example() {
 	fmt.Printf("%@\n", masked)
 }
 
-// This example shows how Newf interacts with a non-traced error compared to
-// when it receives a traced error. Traced errors are included in the trace
-// regardless of the fmt verb used for them, while non-traced errors are
-// handled as usual, but do not get included in the trace.
+// This example shows how Newf interacts with traced and non-traced errors.
+// Traced errors are included in the trace regardless of the fmt verb used for
+// them, while non-traced errors are handled as fmt.Errorf would, but they do
+// not get included in the trace.
 func ExampleNewf() {
 	nonTracedErr := errors.New("non-traced")
 	tracedErr1 := terr.Newf("traced 1")
@@ -40,12 +40,14 @@ func ExampleNewf() {
 	fmt.Println("newErr is tracedErr2:", errors.Is(newErr, tracedErr2))
 }
 
-// This example shows how terr.Trace interacts with a non-traced error compared
-// to when it receives a traced error.
+// This example shows how terr.Trace interacts with traced and non-traced
+// errors.
 func ExampleTrace() {
+	// Adds tracing information to non-traced errors.
 	nonTracedErr := errors.New("non-traced")
 	fmt.Printf("%@\n", terr.Trace(nonTracedErr))
 	fmt.Println("---")
+	// Adds another level of tracing information to traced errors.
 	tracedErr := terr.Newf("traced")
 	fmt.Printf("%@\n", terr.Trace(tracedErr))
 }
@@ -62,9 +64,10 @@ func NewValidationError(msg string) error {
 }
 
 // This example shows how to adding tracing information to custom error types
-// using TraceWithLocation. Custom errors constructors like NewValidationError
-// can define a location for the errors they return. In this case, that
-// location is being set it to the location of the NewValidationError caller.
+// using TraceWithLocation. Custom error type constructors like
+// NewValidationError can define a location for the errors they return. In this
+// case, the location is being set it to the location of the NewValidationError
+// caller.
 func ExampleTraceWithLocation() {
 	// err will be annotated with the line number of the following line.
 	err := NewValidationError("x must be >= 0")
@@ -78,7 +81,7 @@ func ExampleTraceWithLocation() {
 	fmt.Println("Custom error message:", customErr.msg)
 }
 
-// This example shows how to use the n-ary traced error tree returned by
+// This example shows how to use the n-ary error tracing tree returned by
 // terr.TraceTree.
 func ExampleTraceTree() {
 	nonTracedErr := errors.New("non-traced")
@@ -89,7 +92,7 @@ func ExampleTraceTree() {
 		tracedErr1,
 		tracedErr2)
 
-	printNode := func(node terr.TracedError) {
+	printNode := func(node terr.ErrorTracer) {
 		fmt.Printf("Error: %v\n", node.Error())
 		file, line := node.Location()
 		fmt.Printf("Location: %s:%d\n", file, line)

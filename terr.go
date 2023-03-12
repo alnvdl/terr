@@ -1,5 +1,4 @@
-// Package terr implements a minimalistic library for adding error tracing to
-// Go 1.20+.
+// Package terr implements a set of functions for tracing errors in Go 1.20+.
 package terr
 
 import (
@@ -9,25 +8,13 @@ import (
 	"strings"
 )
 
-// TracedError is an error with tracing information (its location) and possibly
-// other related errors, forming a tree of traced errors.
-type TracedError interface {
-	// error is the underlying error.
-	error
-	// Location identifies the file and line where error was created, traced,
-	// wrapped or masked.
-	Location() (string, int)
-	// Children returns other traced errors that were traced, wrapped or
-	// masked by this traced error.
-	Children() []TracedError
-}
-
-// tracedError implements the TracedError interface while being compatible with
-// functions from the "errors" package in the standard library.
+// tracedError implements the error and ErrorTracer interfaces, while being
+// compatible with functions from the "errors" and "fmt" package in the
+// standard library by implementing Is, As, Unwrap and Format.
 type tracedError struct {
 	error
 	location
-	children []TracedError
+	children []ErrorTracer
 }
 
 type location struct {
@@ -41,9 +28,9 @@ func getCallerLocation() location {
 }
 
 func newTracedError(err error, children []error, loc location) error {
-	var terrs []TracedError
+	var terrs []ErrorTracer
 	for _, child := range children {
-		if terr, ok := child.(TracedError); ok {
+		if terr, ok := child.(*tracedError); ok {
 			terrs = append(terrs, terr)
 		}
 	}
@@ -80,13 +67,13 @@ func (e *tracedError) Error() string {
 	return e.error.Error()
 }
 
-// Location implements the TracedError interface.
+// Location implements the ErrorTracer interface.
 func (e *tracedError) Location() (string, int) {
 	return e.file, e.line
 }
 
-// Children implements the TracedError interface.
-func (e *tracedError) Children() []TracedError {
+// Children implements the ErrorTracer interface.
+func (e *tracedError) Children() []ErrorTracer {
 	return e.children
 }
 
@@ -99,11 +86,11 @@ func (e *tracedError) Format(f fmt.State, verb rune) {
 	fmt.Fprintf(f, fmt.FormatString(f, verb), e.error)
 }
 
-// treeRepr returns a tab-indented, multi-line representation of an error tree
-// rooted in err.
+// treeRepr returns a tab-indented, multi-line representation of a traced error
+// tree rooted in err.
 func treeRepr(err error, depth int) []string {
 	var locations []string
-	te := err.(TracedError)
+	te := err.(*tracedError)
 	// No need to check the cast was successful: treeRepr is only invoked
 	// internally via tracedError.Format. If that pre-condition is ever
 	// violated, a panic is warranted.
@@ -122,8 +109,8 @@ func treeRepr(err error, depth int) []string {
 // Newf works exactly like fmt.Errorf, but returns a traced error. All traced
 // errors passed as formatting arguments are included as children, regardless
 // of the formatting verbs used for these errors.
-// Implements the pattern fmt.Errorf("...", ...). If used without verbs and
-// additional arguments, it also implements the pattern errors.New("...").
+// This function is equivalent to fmt.Errorf("...", ...). If used without verbs
+// and additional arguments, it is equivalent to errors.New("...").
 func Newf(format string, a ...interface{}) error {
 	return newTracedError(
 		fmt.Errorf(format, a...),
@@ -143,7 +130,7 @@ func Trace(err error) error {
 }
 
 // TraceWithLocation works like Trace, but lets the caller specify a file and
-// line for the error. This is most useful for custom error constructor
+// line for the error. This function can be used in custom error constructor
 // functions, so they can return a traced error pointing at their callers.
 func TraceWithLocation(err error, file string, line int) error {
 	if err == nil {
@@ -152,12 +139,29 @@ func TraceWithLocation(err error, file string, line int) error {
 	return newTracedError(err, []error{err}, location{file, line})
 }
 
-// TraceTree returns the root of the n-ary traced error tree for err. Returns
-// nil if err is nil or not a traced error.
-// Presenting these arbitrarily complex error trees in human-comprehensible way
-// is left as an exercise to the caller. Or just use fmt.Sprintf("%@", err) for
-// a tab-indented multi-line string representation of the tree.
-func TraceTree(err error) TracedError {
-	te, _ := err.(TracedError)
+// ErrorTracer is an object capable of tracing an error's location and possibly
+// other related errors, forming an error tracing tree.
+// Please note that implementing ErrorTracer is not enough to make an error
+// a traced error: only errors returned by functions in this package are
+// considered traced errors.
+type ErrorTracer interface {
+	// error is the underlying error.
+	error
+	// Location identifies the file and line where error was created, traced,
+	// wrapped or masked.
+	Location() (string, int)
+	// Children returns other traced errors that were traced, wrapped or
+	// masked by this traced error.
+	Children() []ErrorTracer
+}
+
+// TraceTree returns the root of the n-ary error tracing tree for err. Returns
+// nil if err is not a traced error. This function can be used to represent the
+// error tracing tree using custom formats.
+func TraceTree(err error) ErrorTracer {
+	te, _ := err.(*tracedError)
+	if te == nil {
+		return nil
+	}
 	return te
 }
