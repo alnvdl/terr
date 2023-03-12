@@ -23,7 +23,7 @@ type TracedError interface {
 }
 
 // tracedError implements the TracedError interface while being compatible with
-// functions from the standard library "errors" package.
+// functions from the "errors" package in the standard library.
 type tracedError struct {
 	error
 	location
