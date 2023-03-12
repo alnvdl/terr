@@ -15,15 +15,9 @@ func getLocation(depth int) (string, int) {
 	return file, line
 }
 
-func assertString(t *testing.T, got, want string) {
+func assertEquals[T comparable](t *testing.T, got, want T) {
 	if got != want {
-		t.Fatalf("want %q got %q", want, got)
-	}
-}
-
-func assertBool(t *testing.T, got, want bool) {
-	if got != want {
-		t.Fatalf("want %t got %t", want, got)
+		t.Fatalf("want %#v got %#v", want, got)
 	}
 }
 
@@ -44,10 +38,17 @@ func assertTraceTreeEquals(t *testing.T, got terr.TracedError, want terr.TracedE
 		t.Fatalf("want trace is not nil but got trace is nil")
 	}
 
-	assertString(t, got.Location(), want.Location())
-	assertString(t, got.Error(), want.Error())
-	if len(got.Location()) != len(want.Location()) {
-		t.Fatalf("want trace tree with %d children, got trace tree with %d children: want %#v got %#v ", len(want.Children()), len(got.Children()), want.Children(), got.Children())
+	gotFile, gotLine := got.Location()
+	wantFile, wantLine := want.Location()
+	assertEquals(t, gotFile, wantFile)
+	assertEquals(t, gotLine, wantLine)
+	assertEquals(t, got.Error(), want.Error())
+	if len(got.Children()) != len(want.Children()) {
+		t.Fatalf("want trace tree with %d children, got trace tree with %d children: want %#v got %#v ",
+			len(want.Children()),
+			len(got.Children()),
+			want.Children(),
+			got.Children())
 	}
 	for i := range got.Children() {
 		assertTraceTreeEquals(t, got.Children()[i], want.Children()[i])
@@ -59,14 +60,26 @@ func TestTrace(t *testing.T) {
 	err := terr.Newf("fail")
 	tracedErr := terr.Trace(err)
 
-	assertString(t, tracedErr.Error(), "fail")
-	assertBool(t, errors.Is(tracedErr, err), true)
+	assertEquals(t, tracedErr.Error(), "fail")
+	assertEquals(t, errors.Is(tracedErr, err), true)
 	// tracedErr.Unwrap() should still return nil, because no wrapping took place.
 	assertErrorIsNil(t, errors.Unwrap(tracedErr))
-	assertString(t, fmt.Sprintf("%@", tracedErr), strings.Join([]string{
+	assertEquals(t, fmt.Sprintf("%@", tracedErr), strings.Join([]string{
 		fmt.Sprintf("fail @ %s:%d", file, line+2),
 		fmt.Sprintf("\tfail @ %s:%d", file, line+1),
 	}, "\n"))
+}
+
+func TestTraceWithLocation(t *testing.T) {
+	err := terr.TraceWithLocation(errors.New("custom"), "somefile.go", 123)
+
+	assertEquals(t, err.Error(), "custom")
+	// err.Unwrap() should still return nil, because no wrapping took place.
+	assertErrorIsNil(t, errors.Unwrap(err))
+	assertEquals(t, fmt.Sprintf("%@", err), "custom @ somefile.go:123")
+
+	wrappedErr := terr.Newf("%w", err)
+	assertEquals(t, errors.Is(wrappedErr, err), true)
 }
 
 type customError struct {
@@ -74,7 +87,7 @@ type customError struct {
 }
 
 func (e *customError) Error() string {
-	return "base"
+	return e.value
 }
 
 func TestNewf(t *testing.T) {
@@ -84,33 +97,34 @@ func TestNewf(t *testing.T) {
 	tracedErr := terr.Trace(err)
 	wrappedErr := terr.Newf("wrapped: %w", tracedErr)
 	maskedErr := terr.Newf("masked: %v", wrappedErr)
-	f := terr.Newf("newf: %w", maskedErr)
+	wrappedAgain := terr.Newf("newf: %w", maskedErr)
 
-	assertString(t, f.Error(), "newf: masked: wrapped: fail: base")
+	assertEquals(t, wrappedAgain.Error(), "newf: masked: wrapped: fail: test")
 
-	assertBool(t, errors.Is(f, maskedErr), true)
-	assertBool(t, errors.Is(f, wrappedErr), false)
+	assertEquals(t, errors.Is(wrappedAgain, maskedErr), true)
+	assertEquals(t, errors.Is(wrappedAgain, wrappedErr), false)
 
 	var ce *customError
 	ok := errors.As(wrappedErr, &ce)
-	assertBool(t, ok, true)
-	assertString(t, ce.value, "test")
+	assertEquals(t, ok, true)
+	assertEquals(t, ce.value, "test")
 
 	unwrapped := errors.Unwrap(wrappedErr)
-	assertBool(t, unwrapped == tracedErr, true)
+	assertEquals(t, unwrapped == tracedErr, true)
 
-	assertString(t, fmt.Sprintf("%@", f), strings.Join([]string{
-		fmt.Sprintf("newf: masked: wrapped: fail: base @ %s:%d", file, line+5),
-		fmt.Sprintf("\tmasked: wrapped: fail: base @ %s:%d", file, line+4),
-		fmt.Sprintf("\t\twrapped: fail: base @ %s:%d", file, line+3),
-		fmt.Sprintf("\t\t\tfail: base @ %s:%d", file, line+2),
-		fmt.Sprintf("\t\t\t\tfail: base @ %s:%d", file, line+1),
+	assertEquals(t, fmt.Sprintf("%@", wrappedAgain), strings.Join([]string{
+		fmt.Sprintf("newf: masked: wrapped: fail: test @ %s:%d", file, line+5),
+		fmt.Sprintf("\tmasked: wrapped: fail: test @ %s:%d", file, line+4),
+		fmt.Sprintf("\t\twrapped: fail: test @ %s:%d", file, line+3),
+		fmt.Sprintf("\t\t\tfail: test @ %s:%d", file, line+2),
+		fmt.Sprintf("\t\t\t\tfail: test @ %s:%d", file, line+1),
 	}, "\n"))
 }
 
 type traceTreeNode struct {
 	err      string
-	location string
+	file     string
+	line     int
 	children []*traceTreeNode
 }
 
@@ -118,8 +132,8 @@ func (t *traceTreeNode) Error() string {
 	return t.err
 }
 
-func (t *traceTreeNode) Location() string {
-	return t.location
+func (t *traceTreeNode) Location() (string, int) {
+	return t.file, t.line
 }
 
 func (t *traceTreeNode) Children() []terr.TracedError {
@@ -140,11 +154,11 @@ func TestNewfMultiple(t *testing.T) {
 	terr2 := terr.Newf("wrapped: %w", err2)
 	f := terr.Newf("errors: %w and %v", terr1, terr2)
 
-	assertString(t, f.Error(), "errors: fail and wrapped: problem")
-	assertBool(t, errors.Is(f, terr1), true)  // %w was used.
-	assertBool(t, errors.Is(f, terr2), false) // %v was used
+	assertEquals(t, f.Error(), "errors: fail and wrapped: problem")
+	assertEquals(t, errors.Is(f, terr1), true)  // %w was used.
+	assertEquals(t, errors.Is(f, terr2), false) // %v was used
 
-	assertString(t, fmt.Sprintf("%@", f), strings.Join([]string{
+	assertEquals(t, fmt.Sprintf("%@", f), strings.Join([]string{
 		fmt.Sprintf("errors: fail and wrapped: problem @ %s:%d", file, line+5),
 		fmt.Sprintf("\tfail @ %s:%d", file, line+2),
 		fmt.Sprintf("\t\tfail @ %s:%d", file, line+1),
@@ -155,21 +169,26 @@ func TestNewfMultiple(t *testing.T) {
 	// TraceTree has information about the whole tree, but it's not represented
 	// as a string.
 	assertTraceTreeEquals(t, terr.TraceTree(f), &traceTreeNode{
-		err:      f.Error(),
-		location: fmt.Sprintf("%s:%d", file, line+5),
+		err:  f.Error(),
+		file: file,
+		line: line + 5,
 		children: []*traceTreeNode{{
-			err:      terr1.Error(),
-			location: fmt.Sprintf("%s:%d", file, line+2),
+			err:  terr1.Error(),
+			file: file,
+			line: line + 2,
 			children: []*traceTreeNode{{
-				err:      err1.Error(),
-				location: fmt.Sprintf("%s:%d", file, line+1),
+				err:  err1.Error(),
+				file: file,
+				line: line + 1,
 			}},
 		}, {
-			err:      terr2.Error(),
-			location: fmt.Sprintf("%s:%d", file, line+4),
+			err:  terr2.Error(),
+			file: file,
+			line: line + 4,
 			children: []*traceTreeNode{{
-				err:      err2.Error(),
-				location: fmt.Sprintf("%s:%d", file, line+3),
+				err:  err2.Error(),
+				file: file,
+				line: line + 3,
 			}},
 		},
 		},
@@ -178,5 +197,7 @@ func TestNewfMultiple(t *testing.T) {
 
 func TestNil(t *testing.T) {
 	assertErrorIsNil(t, terr.Trace(nil))
+	assertErrorIsNil(t, terr.TraceWithLocation(nil, "somefile.go", 123))
+
 	assertTraceTreeEquals(t, terr.TraceTree(nil), nil)
 }

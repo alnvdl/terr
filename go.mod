@@ -1,6 +1,5 @@
 module github.com/alnvdl/terr
 
-retract v1.0.0 // Published with go 1.13 directive.
-retract v1.0.1 // Published with README typo, v1.0.0 retract did not work.
+retract [v0.0.0, v1.0.7] // Incomplete and/or wrong releases.
 
 go 1.20
