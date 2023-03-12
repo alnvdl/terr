@@ -44,10 +44,9 @@ func ExampleNewf() {
 // to when it receives a traced error.
 func ExampleTrace() {
 	nonTracedErr := errors.New("non-traced")
-	tracedErr := terr.Newf("traced")
-
 	fmt.Printf("%@\n", terr.Trace(nonTracedErr))
 	fmt.Println("---")
+	tracedErr := terr.Newf("traced")
 	fmt.Printf("%@\n", terr.Trace(tracedErr))
 }
 

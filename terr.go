@@ -1,4 +1,4 @@
-// Package terr implements a minimalistic library for adding error tracing in
+// Package terr implements a minimalistic library for adding error tracing to
 // Go 1.20+.
 package terr
 

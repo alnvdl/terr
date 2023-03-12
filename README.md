@@ -4,7 +4,7 @@
 [![Test workflow](https://github.com/alnvdl/terr/actions/workflows/test.yaml/badge.svg)](https://github.com/alnvdl/terr/actions/workflows/test.yaml)
 
 terr (short for **t**raced **err**or) is a minimalistic package for adding
-error tracing in Go 1.20+.
+error tracing to Go 1.20+.
 
 Go's error representation primitives introduced in Go 1.13[^1] are quite
 sufficient, but the lack of tracing capabilities makes it hard to confidently
@@ -30,7 +30,7 @@ Without terr                   | With terr
 `errors.New("error")`          | `terr.Newf("error")`
 `fmt.Errorf("error: %w", err)` | `terr.Newf("error: %w", err)`
 `[return] err`                 | `terr.Trace(err)`
-`[return] NewCustomErr()`      | `terr.TraceWithLocation(NewCustomErr(), ...)`
+`[return] &CustomError{}`      | `terr.TraceWithLocation(&CustomError{}, ...)`
 
 `terr.Newf` can receive multiple errors. In fact, it is just a very slim
 wrapper around `fmt.Errorf`. Any traced error passed to `terr.Newf` will be
