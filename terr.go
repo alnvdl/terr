@@ -27,24 +27,14 @@ func getCallerLocation() location {
 	return location{file, line}
 }
 
-func newTracedError(err error, children []error, loc location) error {
-	var terrs []ErrorTracer
+func newTracedError(err error, children []any, loc location) *tracedError {
+	terr := &tracedError{err, loc, nil}
 	for _, child := range children {
-		if terr, ok := child.(*tracedError); ok {
-			terrs = append(terrs, terr)
+		if child, ok := child.(*tracedError); ok {
+			terr.children = append(terr.children, child)
 		}
 	}
-	return &tracedError{err, loc, terrs}
-}
-
-func filterErrors(objs []interface{}) []error {
-	var errors []error
-	for _, o := range objs {
-		if err, ok := o.(error); ok {
-			errors = append(errors, err)
-		}
-	}
-	return errors
+	return terr
 }
 
 // Is returns whether the error is another error for use with errors.Is.
@@ -53,7 +43,7 @@ func (e *tracedError) Is(target error) bool {
 }
 
 // As returns the error as another error for use with errors.As.
-func (e *tracedError) As(target interface{}) bool {
+func (e *tracedError) As(target any) bool {
 	return errors.As(e.error, target)
 }
 
@@ -111,32 +101,49 @@ func treeRepr(err error, depth int) []string {
 // of the formatting verbs used for these errors.
 // This function is equivalent to fmt.Errorf("...", ...). If used without verbs
 // and additional arguments, it is equivalent to errors.New("...").
-func Newf(format string, a ...interface{}) error {
-	return newTracedError(
-		fmt.Errorf(format, a...),
-		filterErrors(a),
-		getCallerLocation(),
-	)
+func Newf(format string, a ...any) error {
+	return newTracedError(fmt.Errorf(format, a...), a, getCallerLocation())
+}
+
+// A TraceOption allows customization of errors returned by the Trace function.
+type TraceOption func(e *tracedError)
+
+// WithLocation returns a traced error with the given location. This option can
+// be used in custom error constructor functions, so they can return a traced
+// error pointing at their callers.
+func WithLocation(file string, line int) TraceOption {
+	return func(e *tracedError) {
+		e.location = location{file, line}
+	}
+}
+
+// WithChildren returns a traced error with the given traced errors appended as
+// children Non-traced errors are ignored. This option can be used in custom
+// error constructor functions to define the children traced errors for a
+// traced error.
+func WithChildren(children []error) TraceOption {
+	return func(e *tracedError) {
+		for _, child := range children {
+			if terr, ok := child.(*tracedError); ok {
+				e.children = append(e.children, terr)
+			}
+		}
+	}
 }
 
 // Trace returns a new traced error for err. If err is already a traced error,
 // a new traced error will be returned containing err as a child traced error.
-// No wrapping or masking takes place in this function.
-func Trace(err error) error {
+// opts is an optional series of TraceOptions to be applied to the traced
+// error. No wrapping or masking takes place in this function.
+func Trace(err error, opts ...TraceOption) error {
 	if err == nil {
 		return nil
 	}
-	return newTracedError(err, []error{err}, getCallerLocation())
-}
-
-// TraceWithLocation works like Trace, but lets the caller specify a file and
-// line for the error. This function can be used in custom error constructor
-// functions, so they can return a traced error pointing at their callers.
-func TraceWithLocation(err error, file string, line int) error {
-	if err == nil {
-		return nil
+	terr := newTracedError(err, []any{err}, getCallerLocation())
+	for _, opt := range opts {
+		opt(terr)
 	}
-	return newTracedError(err, []error{err}, location{file, line})
+	return terr
 }
 
 // ErrorTracer is an object capable of tracing an error's location and possibly

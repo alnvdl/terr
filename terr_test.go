@@ -68,18 +68,22 @@ func TestTrace(t *testing.T) {
 		fmt.Sprintf("fail @ %s:%d", file, line+2),
 		fmt.Sprintf("\tfail @ %s:%d", file, line+1),
 	}, "\n"))
-}
 
-func TestTraceWithLocation(t *testing.T) {
-	err := terr.TraceWithLocation(errors.New("custom"), "somefile.go", 123)
-
-	assertEquals(t, err.Error(), "custom")
-	// err.Unwrap() should still return nil, because no wrapping took place.
-	assertErrorIsNil(t, errors.Unwrap(err))
-	assertEquals(t, fmt.Sprintf("%@", err), "custom @ somefile.go:123")
-
-	wrappedErr := terr.Newf("%w", err)
-	assertEquals(t, errors.Is(wrappedErr, err), true)
+	tracedErrOpts := terr.Trace(err,
+		terr.WithLocation("somefile.go", 123),
+		terr.WithChildren([]error{tracedErr}),
+	)
+	assertEquals(t, tracedErrOpts.Error(), "fail")
+	assertEquals(t, errors.Is(tracedErrOpts, err), true)
+	// tracedErr.Unwrap() should still return nil, because no wrapping took place.
+	assertErrorIsNil(t, errors.Unwrap(tracedErrOpts))
+	assertEquals(t, fmt.Sprintf("%@", tracedErrOpts), strings.Join([]string{
+		fmt.Sprintf("fail @ %s:%d", "somefile.go", 123),
+		fmt.Sprintf("\tfail @ %s:%d", file, line+1),
+		// tracedErrOpts included tracedErr as a child.
+		fmt.Sprintf("\tfail @ %s:%d", file, line+2),
+		fmt.Sprintf("\t\tfail @ %s:%d", file, line+1),
+	}, "\n"))
 }
 
 type customError struct {
@@ -197,7 +201,7 @@ func TestNewfMultiple(t *testing.T) {
 
 func TestNil(t *testing.T) {
 	assertErrorIsNil(t, terr.Trace(nil))
-	assertErrorIsNil(t, terr.TraceWithLocation(nil, "somefile.go", 123))
+	assertErrorIsNil(t, terr.Trace(nil, terr.WithLocation("somefile.go", 123)))
 
 	assertTraceTreeEquals(t, terr.TraceTree(nil), nil)
 }

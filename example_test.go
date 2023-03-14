@@ -60,15 +60,15 @@ func (e *ValidationError) Error() string {
 
 func NewValidationError(msg string) error {
 	_, file, line, _ := runtime.Caller(1)
-	return terr.TraceWithLocation(&ValidationError{msg}, file, line)
+	return terr.Trace(&ValidationError{msg}, terr.WithLocation(file, line))
 }
 
-// This example shows how to adding tracing information to custom error types
-// using TraceWithLocation. Custom error type constructors like
+// This example shows how to add tracing information to custom error types
+// using Trace and the WithLocation option. Custom error type constructors like
 // NewValidationError can define a location for the errors they return. In this
-// case, the location is being set it to the location of the NewValidationError
+// case, the location is being set to the location of the NewValidationError
 // caller.
-func ExampleTraceWithLocation() {
+func ExampleTrace_customError() {
 	// err will be annotated with the line number of the following line.
 	err := NewValidationError("x must be >= 0")
 	fmt.Printf("%@\n", err)
