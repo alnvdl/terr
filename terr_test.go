@@ -68,21 +68,22 @@ func TestTrace(t *testing.T) {
 		fmt.Sprintf("fail @ %s:%d", file, line+2),
 		fmt.Sprintf("\tfail @ %s:%d", file, line+1),
 	}, "\n"))
+}
 
-	tracedErrOpts := terr.Trace(err,
-		terr.WithLocation("somefile.go", 123),
-		terr.WithChildren([]error{tracedErr}),
-	)
-	assertEquals(t, tracedErrOpts.Error(), "fail")
-	assertEquals(t, errors.Is(tracedErrOpts, err), true)
-	// tracedErr.Unwrap() should still return nil, because no wrapping took place.
-	assertErrorIsNil(t, errors.Unwrap(tracedErrOpts))
-	assertEquals(t, fmt.Sprintf("%@", tracedErrOpts), strings.Join([]string{
-		fmt.Sprintf("fail @ %s:%d", "somefile.go", 123),
+func TestTraceSkip(t *testing.T) {
+	file, line := getLocation(0)
+	err := terr.Newf("fail")
+	newCustomError := func() error {
+		return terr.TraceSkip(err, 1)
+	}
+	customErr := newCustomError()
+	assertEquals(t, customErr.Error(), "fail")
+	assertEquals(t, errors.Is(customErr, err), true)
+	// customErr.Unwrap() should still return nil, because no wrapping took place.
+	assertErrorIsNil(t, errors.Unwrap(customErr))
+	assertEquals(t, fmt.Sprintf("%@", customErr), strings.Join([]string{
+		fmt.Sprintf("fail @ %s:%d", file, line+5),
 		fmt.Sprintf("\tfail @ %s:%d", file, line+1),
-		// tracedErrOpts included tracedErr as a child.
-		fmt.Sprintf("\tfail @ %s:%d", file, line+2),
-		fmt.Sprintf("\t\tfail @ %s:%d", file, line+1),
 	}, "\n"))
 }
 
@@ -201,7 +202,7 @@ func TestNewfMultiple(t *testing.T) {
 
 func TestNil(t *testing.T) {
 	assertErrorIsNil(t, terr.Trace(nil))
-	assertErrorIsNil(t, terr.Trace(nil, terr.WithLocation("somefile.go", 123)))
+	assertErrorIsNil(t, terr.TraceSkip(nil, 1))
 
 	assertTraceTreeEquals(t, terr.TraceTree(nil), nil)
 }

@@ -31,23 +31,22 @@ Without terr                   | With terr
 `errors.New("error")`          | `terr.Newf("error")`
 `fmt.Errorf("error: %w", err)` | `terr.Newf("error: %w", err)`
 `[return] err`                 | `terr.Trace(err)`
-`[return] &CustomError{}`      | `terr.Trace(&CustomError{}, ...opts)`
+`[return] &CustomError{}`      | `terr.TraceSkip(&CustomError{}, 1)`
 
 `terr.Newf` can receive multiple errors. In fact, it is just a very slim
 wrapper around `fmt.Errorf`. Any traced error passed to `terr.Newf` will be
 included in the error tracing tree, regardless of the `fmt` verb used for it.
 
-`terr.Trace` on the other hand does nothing with the error it receive (no
-wrapping and no masking), but it adds one level to the error tracing tree.
-`terr.Trace` can also receive additional options to support custom errors:
-`terr.WithLocation` and `terr.WithChildren`, which allow changing attributes of
-the traced error.
+`terr.Trace` and `terr.TraceSkip` on the other hand do nothing with the error
+they receive (no wrapping and no masking), but they add one level to the error
+tracing tree. `terr.TraceSkip` lets custom errors constructors return a traced
+error with the location defined by skipping a number of stack frames.
 
 To obtain the full trace, terr functions must be used consistently. If
 `fmt.Errorf` is used at one point, the error tracing information will be reset
 at that point, but Go's wrapped error tree will be preserved even in that case.
 
-Examples are available showing all these functions in use[^2].
+Examples are available showing these functions in use[^2].
 
 In the glorious day error tracing is added to Go, and assuming it gets done in
 a way that respects error handling as defined in Go 1.13+,
@@ -56,8 +55,8 @@ replacing the `terr` function calls with equivalent expressions.
 
 ### Tracing custom errors
 Custom errors can be turned into traced errors as well by using
-`terr.Trace(err, terr.WithLocation(file, line))` in constructor functions. An
-example is available[^3].
+`terr.TraceSkip(err, skip)` in constructor functions. An example is
+available[^3].
 
 ### Printing errors
 An error tracing tree can be printed with the special `%@` formatting verb. An
@@ -107,13 +106,12 @@ $ gofmt -w -r 'fmt.Errorf -> terr.Newf' .
 $ goimports -w .
 ```
 
-Adopting `terr.Trace` is harder, as it is impossible to write a simple gofmt
-rewrite rule that works for all cases. So it has to be applied by hand
-following these guidelines:
+Adopting `terr.Trace` and `terr.TraceSkip` is harder, as it is impossible to
+write a simple gofmt rewrite rule that works for all cases. So they have to be
+applied by hand following these guidelines:
 - `return err` becomes `return terr.Trace(err)`;
 - `return NewCustomErr()` requires an adaptation in `NewCustomErr` to use
-  `terr.Trace`, possibly with options (usually only `terr.WithLocation`, but
-  `terr.WithChildren` is also available). An example is available[^3].
+  `terr.TraceSkip`. An example is available[^3].
 
 ### Getting rid of terr
 Run the following commands in a directory tree to get rid of terr in all its
@@ -122,15 +120,14 @@ files (make sure `goimports`[^6] is installed first):
 $ gofmt -w -r 'terr.Newf(a) -> errors.New(a)' .
 $ gofmt -w -r 'terr.Newf -> fmt.Errorf' .
 $ gofmt -w -r 'terr.Trace(a) -> a' .
-$ gofmt -w -r 'terr.Trace(a, b) -> a' .
-$ gofmt -w -r 'terr.Trace(a, b, c) -> a' .
+$ gofmt -w -r 'terr.TraceSkip(a, b) -> a' .
 $ goimports -w .
 $ go mod tidy
 ```
 
 [^1]: https://go.dev/blog/go1.13-errors
 [^2]: https://pkg.go.dev/github.com/alnvdl/terr#pkg-examples
-[^3]: https://pkg.go.dev/github.com/alnvdl/terr#example-Trace-CustomError
+[^3]: https://pkg.go.dev/github.com/alnvdl/terr#example-TraceSkip
 [^4]: https://pkg.go.dev/github.com/alnvdl/terr#example-package
 [^5]: https://pkg.go.dev/github.com/alnvdl/terr#example-TraceTree
 [^6]: https://pkg.go.dev/golang.org/x/tools/cmd/goimports

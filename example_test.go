@@ -3,7 +3,6 @@ package terr_test
 import (
 	"errors"
 	"fmt"
-	"runtime"
 
 	"github.com/alnvdl/terr"
 )
@@ -59,16 +58,15 @@ func (e *ValidationError) Error() string {
 }
 
 func NewValidationError(msg string) error {
-	_, file, line, _ := runtime.Caller(1)
-	return terr.Trace(&ValidationError{msg}, terr.WithLocation(file, line))
+	return terr.TraceSkip(&ValidationError{msg}, 1)
 }
 
 // This example shows how to add tracing information to custom error types
-// using Trace and the WithLocation option. Custom error type constructors like
-// NewValidationError can define a location for the errors they return. In this
-// case, the location is being set to the location of the NewValidationError
-// caller.
-func ExampleTrace_customError() {
+// using TraceSkip. Custom error type constructors like NewValidationError can
+// define a number of stack frames to skip for defining the location of the
+// traced errors they return. In this case, the location is being set to the
+// location of the callor of NewValidationError.
+func ExampleTraceSkip() {
 	// err will be annotated with the line number of the following line.
 	err := NewValidationError("x must be >= 0")
 	fmt.Printf("%@\n", err)
