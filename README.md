@@ -54,9 +54,8 @@ a way that respects error handling as defined in Go 1.13+,
 replacing the `terr` function calls with equivalent expressions.
 
 ### Tracing custom errors
-Custom errors can be turned into traced errors as well by using
-`terr.TraceSkip(err, skip)` in constructor functions. An example is
-available[^3].
+Constructor functions for custom error types and wrapped sentinel errors[^1]
+can use `terr.TraceSkip(err, skip)`. An example is available[^3].
 
 ### Printing errors
 An error tracing tree can be printed with the special `%@` formatting verb. An
@@ -70,7 +69,7 @@ walks the error tracing tree and outputs it in the desired format. See the
 ### Walking the error tracing tree
 Starting with Go 1.20, wrapped errors are kept as a n-ary tree. terr works by
 building a tree containing tracing information in parallel, leaving the Go
-error tree untouched, as if terr weren't being used. Each traced error is thus
+error tree untouched, as if terr were not being used. Each traced error is thus
 a node in this parallel error tracing tree.
 
 `terr.TraceTree(err) ErrorTracer` can be used to obtain the root of an n-ary
@@ -97,23 +96,22 @@ errors (e.g., `errors.Unwrap`).
 An example is available[^5].
 
 ### Adopting terr
-Run the following commands in a directory tree to adopt terr in all its files
-(make sure `goimports`[^6] is installed first):
-```sh
-$ go get github.com/alnvdl/terr
-$ gofmt -w -r 'errors.New(a) -> terr.Newf(a)' .
-$ gofmt -w -r 'fmt.Errorf -> terr.Newf' .
-$ goimports -w .
-```
+Adopting terr requires some thought about how errors are being constructed and
+which errors are worth tracing. Usage of terr may vary greatly for different
+code bases, and it is easiest to adopt terr when just the vanilla Go error
+handling practices are in use, without any third-party libraries.
 
-Adopting `terr.Trace` and `terr.TraceSkip` is harder, as it is impossible to
-write a simple gofmt rewrite rule that works for all cases. So they have to be
-applied by hand following these guidelines:
-- `return err` becomes `return terr.Trace(err)`;
-- `return NewCustomErr()` requires an adaptation in `NewCustomErr` to use
-  `terr.TraceSkip`. An example is available[^3].
+The terr examples[^2], particularly the example for `terr.TraceSkip`[^3],
+provide a good illustration of how to use terr while following Go's
+recommended error guidelines[^1].
+
+In larger code bases, using `gofmt -r` might help, but it might also produce
+unwanted results if not used carefully. Applying the reverse of the rewrite
+rules mentioned in the [next sub-section](#getting-rid-of-terr) may be helpful
+in some cases.
 
 ### Getting rid of terr
+While adopting terr can be hard, removing it from a code base is very easy.
 Run the following commands in a directory tree to get rid of terr in all its
 files (make sure `goimports`[^6] is installed first):
 ```sh
@@ -124,6 +122,9 @@ $ gofmt -w -r 'terr.TraceSkip(a, b) -> a' .
 $ goimports -w .
 $ go mod tidy
 ```
+
+Also make sure to remove any uses of the `%@` fmt verb, since this verb only
+works with traced errors.
 
 [^1]: https://go.dev/blog/go1.13-errors
 [^2]: https://pkg.go.dev/github.com/alnvdl/terr#pkg-examples
