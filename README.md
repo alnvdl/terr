@@ -6,7 +6,8 @@
 terr (short for **t**raced **err**or) is a minimalistic library for adding
 error tracing to Go 1.20+.
 
-The error representation primitives introduced in Go 1.13[^1] are quite
+The error representation primitives
+[introduced in Go 1.13](https://go.dev/blog/go1.13-errors) are quite
 sufficient, but the lack of tracing capabilities makes it hard to confidently
 debug errors across layers in complex applications.
 
@@ -14,7 +15,7 @@ To help with that, terr fully embraces the native Go error handling paradigms,
 but it adds two features:
 - file and line information for tracing errors;
 - the ability to print error tracing trees using the `fmt` package with the
-  `%@` verb;
+  `%@` verb.
 
 This package introduces the concept of **traced errors**: a wrapper for errors
 that includes the location where they were created (`errors.New`), passed along
@@ -22,8 +23,12 @@ that includes the location where they were created (`errors.New`), passed along
 children traced errors that relate to them. An error is a traced error if it
 was returned by one of the functions of this package.
 
-Most importantnly, traced errors work seamlessly with `errors.Is`, `errors.As`
+Most importantly, traced errors work seamlessly with `errors.Is`, `errors.As`
 and `errors.Unwrap` just as if terr were not being used.
+
+This [blog post](https://alnvdl.github.io/2023/09/07/error-handling-in-go.html)
+explains more about good practices for error handling in Go and the reasons for
+terr being created.
 
 ## Using terr
 Without terr                   | With terr
@@ -46,25 +51,28 @@ To obtain the full trace, terr functions must be used consistently. If
 `fmt.Errorf` is used at one point, the error tracing information will be reset
 at that point, but Go's wrapped error tree will be preserved even in that case.
 
-Examples are available showing these functions in use[^2].
+To see these functions in use, check out the package
+[examples](https://pkg.go.dev/github.com/alnvdl/terr#pkg-examples).
 
 In the glorious day error tracing is added to Go, and assuming it gets done in
 a way that respects error handling as defined in Go 1.13+,
-[removing `terr` from a codebase](#getting-rid-of-terr) should be a matter of
+[removing `terr` from a code base](#getting-rid-of-terr) should be a matter of
 replacing the `terr` function calls with equivalent expressions.
 
-### Tracing custom errors
-Constructor functions for custom error types and wrapped sentinel errors[^1]
-can use `terr.TraceSkip(err, skip)`. An example is available[^3].
-
 ### Printing errors
-An error tracing tree can be printed with the special `%@` formatting verb. An
-example is available[^4].
+An error tracing tree can be printed with the special `%@` formatting verb
+([example](https://pkg.go.dev/github.com/alnvdl/terr#example-package)).
 
 `%@` prints the tree in a tab-indented, multi-line representation. If a custom
 format is needed (e.g., JSON), it is possible to implement a function that
-walks the error tracing tree and outputs it in the desired format. See the
-[next subsection](#walking-the-error-tracing-tree).
+walks the error tracing tree and outputs it in the desired format. See
+[how to walk the error tracing tree](#walking-the-error-tracing-tree).
+
+### Tracing custom errors
+Constructor functions for custom error types and wrapped
+[sentinel errors](https://go.dev/blog/go1.13-errors)
+can use `terr.TraceSkip(err, skip)`
+([example](https://pkg.go.dev/github.com/alnvdl/terr#example-TraceSkip)).
 
 ### Walking the error tracing tree
 Starting with Go 1.20, wrapped errors are kept as a n-ary tree. terr works by
@@ -93,7 +101,7 @@ Methods provided by the by the Go standard library should be used to walk Go's
 wrapped error tree, which would include non-traced errors and ignore masked
 errors (e.g., `errors.Unwrap`).
 
-An example is available[^5].
+[An example is available](https://pkg.go.dev/github.com/alnvdl/terr#example-TraceTree).
 
 ### Adopting terr
 Adopting terr requires some thought about how errors are being constructed and
@@ -101,19 +109,23 @@ which errors are worth tracing. Usage of terr may vary greatly for different
 code bases, and it is easiest to adopt terr when just the vanilla Go error
 handling practices are in use, without any third-party libraries.
 
-The terr examples[^2], particularly the example for `terr.TraceSkip`[^3],
-provide a good illustration of how to use terr while following Go's
-recommended error guidelines[^1].
+The [terr examples](https://pkg.go.dev/github.com/alnvdl/terr#pkg-examples),
+particularly the example for
+[`terr.TraceSkip`](https://pkg.go.dev/github.com/alnvdl/terr#example-TraceSkip),
+provide a good illustration of how to use terr while following Go's recommended
+error [guidelines](https://go.dev/blog/go1.13-errors).
 
 In larger code bases, using `gofmt -r` might help, but it might also produce
 unwanted results if not used carefully. Applying the reverse of the rewrite
-rules mentioned in the [next sub-section](#getting-rid-of-terr) may be helpful
-in some cases.
+rules [for getting rid of terr](#getting-rid-of-terr) may be helpful when
+introducing terr to a code base.
 
 ### Getting rid of terr
-While adopting terr can be hard, removing it from a code base is very easy.
-Run the following commands in a directory tree to get rid of terr in all its
-files (make sure `goimports`[^6] is installed first):
+While adding terr to a large code base can take some effort, removing it is
+very easy. Run the following commands in a directory tree to get rid of terr in
+all its files (make sure
+[`goimports`](https://pkg.go.dev/golang.org/x/tools/cmd/goimports) is installed
+first):
 ```sh
 $ gofmt -w -r 'terr.Newf(a) -> errors.New(a)' .
 $ gofmt -w -r 'terr.Newf -> fmt.Errorf' .
@@ -125,10 +137,3 @@ $ go mod tidy
 
 Also make sure to remove any uses of the `%@` fmt verb, since this verb only
 works with traced errors.
-
-[^1]: https://go.dev/blog/go1.13-errors
-[^2]: https://pkg.go.dev/github.com/alnvdl/terr#pkg-examples
-[^3]: https://pkg.go.dev/github.com/alnvdl/terr#example-TraceSkip
-[^4]: https://pkg.go.dev/github.com/alnvdl/terr#example-package
-[^5]: https://pkg.go.dev/github.com/alnvdl/terr#example-TraceTree
-[^6]: https://pkg.go.dev/golang.org/x/tools/cmd/goimports
